@@ -28,14 +28,14 @@ public class SQLUtils {
 		FileInputStream fis = new FileInputStream(fin);
 
 		// Construct BufferedReader from InputStreamReader
-		BufferedReader br = new BufferedReader(new InputStreamReader(fis));
+		BufferedReader br = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
 		String line = null;
 		while ((line = br.readLine()) != null) {
-			line = line.trim();
-			if (line.length() == 0 || line.startsWith("--")) {
+			
+			if (line.length() == 0 || line.startsWith("--") || ((int) line.charAt(0) == 65279 && line.substring(1).startsWith("--")) ) {
 				continue;
 			}
-
+			
 			// Line white space adjustment
 			line = line.replaceAll("\\s{2,}", " ");
 
@@ -48,16 +48,22 @@ public class SQLUtils {
 				if (temp1Line.toString().toUpperCase().contains("CREATE TABLE") && !temp1Line.toString().toUpperCase().contains("CREATE TABLE IF NOT EXISTS")) {
 					// CREATE
 					newLine = temp1Line.toString().replaceAll("(?i)CREATE TABLE", "CREATE TABLE IF NOT EXISTS");
+				} else if (temp1Line.toString().toUpperCase().contains("GRANT ") && temp1Line.toString().toUpperCase().contains("ON ALL TABLES")) {
+					// GRANT
+					newLine = "-- " + temp1Line.toString();
 				} else if (temp1Line.toString().toUpperCase().contains("GRANT ")) {
 					// GRANT
-					newLine = temp1Line.toString().replaceAll("(?i)\\s+TO\\s+\\w+\\s?;", " TO public;");
+					newLine = temp1Line.toString().replaceAll("(?i)\\s+TO\\s+[\\w|_|,|\\s]+?;", " TO public;");
 				} else if (Pattern.compile("(?i)CREATE\\s+TRIGGER\\s+\\w+_(audit|log_changes)\\s+").matcher(temp1Line.toString()).find()) {
+					// TRIGGER
+					newLine = "-- " + temp1Line.toString();
+				} else if (Pattern.compile("(?i)DROP\\s+TRIGGER( IF EXISTS)?\\s+\\w+_(audit|log_changes)\\s+").matcher(temp1Line.toString()).find()) {
 					// TRIGGER
 					newLine = "-- " + temp1Line.toString();
 				} else {
 					newLine = temp1Line.toString();
 				}
-					
+
 				if (duplicateDetection.get(newLine) == null) {
 					duplicateDetection.put(newLine, 0);
 					result.append(newLine);
